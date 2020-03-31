@@ -1,10 +1,18 @@
 package orm;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
+import annotations.Column;
+import annotations.CreateTable;
+import annotations.Delete;
+import annotations.MappedClass;
+import annotations.Save;
+import annotations.Select;
 import realdb.GhettoJdbcBlackBox;
 
 public class DaoInvocationHandler implements InvocationHandler {
@@ -32,6 +40,24 @@ public class DaoInvocationHandler implements InvocationHandler {
 			// @Save
 			// @Delete
 			// @Select
+		
+		if(method.isAnnotationPresent(CreateTable.class)) {
+			
+			createTable(method);
+			
+		} else if(method.isAnnotationPresent(Save.class)) {
+			
+			save(method, method.getParameters());
+			
+		} else if(method.isAnnotationPresent(Delete.class)) {
+			
+			delete(method, method.getParameters());
+			
+		} else if(method.isAnnotationPresent(Select.class)) {
+			
+			select(method, args);
+			
+		}
 			
 		return null;
 	}
@@ -52,7 +78,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 	
 	
 	// handles @CreateTable
-	private void createTable(Method method)
+	private void createTable(Method method) throws Exception
 	{
 		
 // 		SAMPLE SQL 		
@@ -65,10 +91,56 @@ public class DaoInvocationHandler implements InvocationHandler {
 		// use reflection to check all the fields for @Column
 		// use the @Column attributed to generate the required sql statment
 		
+		String sqlStatement = "CREATE TABLE ";
+		String idStatement = "";
 		
+		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
+		Field[] fields = c.getDeclaredFields();
+		
+		//Add the table type by using the class name
+		sqlStatement = sqlStatement + c.getName() + " (";
+		
+		int numFields = fields.length;
+		int counter = 0;
+		
+		for(Field f:fields) {
+			
+			f.setAccessible(true);
+			if(f.isAnnotationPresent(Column.class)) {
+				
+				//Idk if we should use the column name or the name of the field
+				//But I will be using the name of the field. I'll just leave this commented
+				//String name = f.getAnnotation(Column.class).name();
+				String name = f.getName();
+				String sqlType = f.getAnnotation(Column.class).sqlType();
+				Boolean id = f.getAnnotation(Column.class).id();
+				
+				sqlStatement = sqlStatement + name + " " + sqlType;
+				
+				//Check if we should add a comma (shouldn't add if its the last)
+				if(counter <= numFields - 1) {
+					sqlStatement += ", ";
+				}
+				
+				//This determines which field is the primary id 
+				if(id) {
+					idStatement = idStatement + ",PRIMARY KEY ( " + f.getName() + " ))";
+				}
+				
+			}
+			counter++;
+		}
+		
+		//Check which closing statement should be taken 
+		if(idStatement.equals("")) {
+			sqlStatement += ")";
+		} else {
+			sqlStatement = sqlStatement + idStatement;
+		}
 		
 // 		Run the sql
-		// jdbc.runSQL(SQL STRING);
+		String sql = getValueAsSql(sqlStatement);
+		jdbc.runSQL(sql);
 	}
 	
 	// handles @Delete
