@@ -1,13 +1,18 @@
 package orm;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 import annotations.Column;
 import annotations.Entity;
 import annotations.MappedClass;
+import annotations.Param;
+import annotations.Select;
 import dao.BasicMapper;
 import io.github.lukehutch.fastclasspathscanner.FastClasspathScanner;
 import io.github.lukehutch.fastclasspathscanner.scanner.ScanResult;
@@ -51,6 +56,118 @@ public class MyORM
 				// if not throw new RuntimeException("No @Entity")
 				throw new RuntimeException("No @Entity");
 			}
+		}
+		
+		//Bonus 2
+		for (Class c : entityToMapperMap.values()) {
+			
+			MappedClass mc = (MappedClass) c.getAnnotation(MappedClass.class);
+			Class mcClass = mc.clazz();
+			
+			Method[] methods = c.getDeclaredMethods();
+			Field[] fields = mcClass.getDeclaredFields();
+			
+			for(Method m : methods) {
+				
+				if (m.isAnnotationPresent(Select.class)) {
+					
+					Select select = m.getAnnotation(Select.class);
+					String selectString = select.value();
+					
+					//For queries with @Param, check to see if the java type of the parameter is the same as the java type of the corresponding field in the entity
+					//MAKE AN ASSUMPTION, the name used in the @Param is the actual column name in the SQL
+					Parameter[] params = m.getParameters();
+					if (params!=null) {
+						
+						for (Parameter param : params){
+							Param p = param.getAnnotation(Param.class);
+							if (p!=null) {
+								
+								//Check if the query string contains the placeholders for all the @Param names
+								if(!select.value().contains(p.value())) {
+									//If an error occurs throw a RuntimeException stating the error and stop the program
+									throw new RuntimeException("Query string does not contain placeholder for "+p.value());
+								}
+								
+								for (Field f : fields) {
+									if (f.isAnnotationPresent(Column.class)) {
+										Column column = f.getAnnotation(Column.class);
+										
+										//Finding the column name of the parameter
+										String placeholder = ":"+p.value();
+										int startIndex = selectString.indexOf(placeholder);
+										String columnName = "";
+										int count = 0;
+										for (int i=startIndex; i>0; i--) {
+											if (selectString.substring(i-1,i).equals("=")){
+												count++;
+											}
+											else if (count>0 && !selectString.substring(i-1,i).equals(" ")) {
+												columnName=selectString.substring(i-1,i)+columnName;
+												count++;
+											}
+											else if (count>2 && selectString.substring(i-1,i).equals(" ")) {
+												break;
+											}
+										}
+
+										if (column.name().equals(columnName)) {
+											if (param.getType()!=f.getType()) {
+												//If an error occurs throw a RuntimeException stating the error and stop the program
+												throw new RuntimeException("Java type of parameter does not match the one in entity");
+											}
+										}
+									}
+								}
+								
+							}
+						}
+					}
+					
+					//Check if every placeholder has a corresponding @Param
+					ArrayList<String> placeholders = new ArrayList<>();
+					for (int i=0; i<selectString.length(); i++) {
+						String temp = "";
+						int newIndex = 0;
+						if (selectString.substring(i,i+1).equals(":")) {
+							i++;
+							while (!selectString.substring(i,i+1).equals(" ")) {
+								temp+=selectString.substring(i,i+1);
+								newIndex = i;
+								if (i<selectString.length()-1) {
+									i++;
+								}
+								else {
+									break;
+								}
+							}
+						}
+						if (!temp.equals("")) {
+							if (!temp.equals("table")) {
+								placeholders.add(temp);
+							}
+							i=newIndex;
+						}
+					}
+					for (int i=0; i<placeholders.size(); i++) {
+						boolean found = false;
+						if (params!=null) {
+							for (Parameter param : params) {
+								Param p = param.getAnnotation(Param.class);
+								String val = p.value();
+								if (val.contentEquals(placeholders.get(i))) {
+									found = true;
+								}
+							}
+						}
+						if (!found) {
+							//If an error occurs throw a RuntimeException stating the error and stop the program
+							throw new RuntimeException ("Placeholder has no corresponsing @Param for :" + placeholders.get(i));
+						}
+						found = false;
+					}
+				}
+			}	
 		}
 	}
 	
