@@ -10,6 +10,7 @@ import java.util.List;
 import annotations.Column;
 import annotations.CreateTable;
 import annotations.Delete;
+import annotations.Entity;
 import annotations.MappedClass;
 import annotations.Save;
 import annotations.Select;
@@ -47,11 +48,11 @@ public class DaoInvocationHandler implements InvocationHandler {
 			
 		} else if(method.isAnnotationPresent(Save.class)) {
 			
-			save(method, method.getParameters());
+			save(method, args);
 			
 		} else if(method.isAnnotationPresent(Delete.class)) {
 			
-			delete(method, method.getParameters());
+			delete(method, args);
 			
 		} else if(method.isAnnotationPresent(Select.class)) {
 			
@@ -98,7 +99,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		Field[] fields = c.getDeclaredFields();
 		
 		//Add the table type by using the class name
-		sqlStatement = sqlStatement + c.getName() + " (";
+		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " (";
 		
 		int numFields = fields.length;
 		int counter = 0;
@@ -108,10 +109,8 @@ public class DaoInvocationHandler implements InvocationHandler {
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(Column.class)) {
 				
-				//Idk if we should use the column name or the name of the field
-				//But I will be using the name of the field. I'll just leave this commented
-				//String name = f.getAnnotation(Column.class).name();
-				String name = f.getName();
+				String name = f.getAnnotation(Column.class).name();
+				//String name = f.getName();
 				String sqlType = f.getAnnotation(Column.class).sqlType();
 				Boolean id = f.getAnnotation(Column.class).id();
 				
@@ -165,7 +164,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		Field[] fields = c.getDeclaredFields();
 		
 		//Add the table type by using the class name
-		sqlStatement = sqlStatement + c.getName() + " ";
+		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " ";
 		
 		int counter = 0;
 		int pkId = -1;
@@ -187,9 +186,9 @@ public class DaoInvocationHandler implements InvocationHandler {
 		}
 		
 		try {
-			if(pkId != -1) {	
+			if(pkId != -1 && o != null) {	
 				
-				String fieldPk = fields[pkId].getName();
+				String fieldPk = fields[pkId].getAnnotation(Column.class).name();
 				sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + o.toString();
 				
 			}
@@ -212,7 +211,35 @@ public class DaoInvocationHandler implements InvocationHandler {
 		// for the Object o parameter, get the value of the field
 			// if the field is null run the insert(Object o, Class entityClass, String tableName) method
 			// if the field is not null run the update(Object o, Class entityClass, String tableName) method
-
+		
+		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
+		Field[] fields = c.getDeclaredFields();
+		
+		int counter = 0;
+		int pkId = -1;
+		
+		for(Field f:fields) {
+			
+			f.setAccessible(true);
+			if(f.isAnnotationPresent(Column.class)) {
+				
+				Boolean id = f.getAnnotation(Column.class).id();
+				
+				//This determines which field is the primary id 
+				if(id) {
+					pkId = counter;
+				}
+				
+			}
+			counter++;
+		}
+		
+		if(o != null) {		
+			insert(o, c, ((Entity) c.getAnnotation(Entity.class)).table());		
+		} else {		
+			update(o, c, ((Entity) c.getAnnotation(Entity.class)).table());
+		}
+		
 	}
 
 	private void insert(Object o, Class entityClass, String tableName) throws Exception 
@@ -225,10 +252,40 @@ public class DaoInvocationHandler implements InvocationHandler {
 
 
 //		HINT: columnX comes from the entityClass, valueX comes from o 
+		String sqlStatement = "INSERT INTO " + tableName + " (";
+		String valStatement = "VALUES (";
+		Field[] fields = entityClass.getDeclaredFields();
 		
+		int numFields = fields.length;
+		int counter = 0;
 		
-// 		run sql		
-//		jdbc.runSQL(SQL STRING);
+		for(Field f:fields) {
+			
+			f.setAccessible(true);
+			if(f.isAnnotationPresent(Column.class)) {
+				
+				String name = f.getAnnotation(Column.class).name();
+				
+				//String name = f.getName();
+				
+				sqlStatement = sqlStatement + name;
+				
+				
+				//Check if we should add a comma (shouldn't add if its the last)
+				if(counter <= numFields - 1) {
+					sqlStatement += ", ";
+					valStatement += ", ";
+				}
+				
+			}
+			counter++;
+		}
+
+		sqlStatement = sqlStatement + valStatement;
+		
+// 		Run the sql
+		String sql = getValueAsSql(sqlStatement);
+		jdbc.runSQL(sql);
 	}
 
 	private void update(Object o, Class entityClass, String tableName) throws IllegalAccessException, Exception {
