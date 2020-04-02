@@ -79,7 +79,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 	
 	
 	// handles @CreateTable
-	private void createTable(Method method) throws Exception
+	private void createTable(Method method)
 	{
 		
 // 		SAMPLE SQL 		
@@ -99,7 +99,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		Field[] fields = c.getDeclaredFields();
 		
 		//Add the table type by using the class name
-		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " (";
+		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table().toUpperCase() + " (";
 		
 		int numFields = fields.length;
 		int counter = 0;
@@ -117,13 +117,13 @@ public class DaoInvocationHandler implements InvocationHandler {
 				sqlStatement = sqlStatement + name + " " + sqlType;
 				
 				//Check if we should add a comma (shouldn't add if its the last)
-				if(counter <= numFields - 1) {
+				if(counter < numFields - 1) {
 					sqlStatement += ", ";
 				}
 				
 				//This determines which field is the primary id 
 				if(id) {
-					idStatement = idStatement + ",PRIMARY KEY ( " + f.getName() + " ))";
+					idStatement = idStatement + ", PRIMARY KEY ( " + name + " ))";
 				}
 				
 			}
@@ -138,8 +138,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		}
 		
 // 		Run the sql
-		String sql = getValueAsSql(sqlStatement);
-		jdbc.runSQL(sql);
+		jdbc.runSQL(sqlStatement);
 	}
 	
 	// handles @Delete
@@ -186,19 +185,20 @@ public class DaoInvocationHandler implements InvocationHandler {
 		}
 		
 		try {
+			
 			if(pkId != -1 && o != null) {	
 				
 				String fieldPk = fields[pkId].getAnnotation(Column.class).name();
 				sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + o.toString();
 				
 			}
+			
 		} catch (RuntimeException e) {
 			System.out.println("no pk value");
 		}
 		
 		// run the sql
-		String sql = getValueAsSql(sqlStatement);
-		jdbc.runSQL(sql);
+		jdbc.runSQL(sqlStatement);
 	}
 	
 	// handles @Save
@@ -254,7 +254,9 @@ public class DaoInvocationHandler implements InvocationHandler {
 //		HINT: columnX comes from the entityClass, valueX comes from o 
 		String sqlStatement = "INSERT INTO " + tableName + " (";
 		String valStatement = "VALUES (";
+		
 		Field[] fields = entityClass.getDeclaredFields();
+		Field[] oFields = o.getClass().getDeclaredFields();
 		
 		int numFields = fields.length;
 		int counter = 0;
@@ -265,14 +267,16 @@ public class DaoInvocationHandler implements InvocationHandler {
 			if(f.isAnnotationPresent(Column.class)) {
 				
 				String name = f.getAnnotation(Column.class).name();
+				String valMethod = "get" + oFields[counter].getName().substring(0, 1).toUpperCase() 
+						      + oFields[counter].getName().substring(1) + "()";
 				
-				//String name = f.getName();
+				Method method = entityClass.getDeclaredMethod(valMethod);
 				
 				sqlStatement = sqlStatement + name;
-				
+				valStatement = valStatement + method.invoke(entityClass);
 				
 				//Check if we should add a comma (shouldn't add if its the last)
-				if(counter <= numFields - 1) {
+				if(counter < numFields - 1) {
 					sqlStatement += ", ";
 					valStatement += ", ";
 				}
@@ -284,8 +288,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		sqlStatement = sqlStatement + valStatement;
 		
 // 		Run the sql
-		String sql = getValueAsSql(sqlStatement);
-		jdbc.runSQL(sql);
+		jdbc.runSQL(sqlStatement);
 	}
 
 	private void update(Object o, Class entityClass, String tableName) throws IllegalAccessException, Exception {
