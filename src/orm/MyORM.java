@@ -91,7 +91,7 @@ public class MyORM
 		// all proxies will use the supplied DaoInvocationHandler as the InvocationHandler
 		Object object =  Proxy.newProxyInstance(
 				ClassLoader.getSystemClassLoader(), 					
-				new Class[] { entityToMapperMap.get(clazz) }, 
+				new Class[] { clazz }, 
 				new DaoInvocationHandler()							
 				);
 		
@@ -105,7 +105,7 @@ public class MyORM
 		for (Class c : entityToMapperMap.keySet()) {
 			// create a proxy instance for each
 			// all these proxies can be casted to BasicMapper
-			Object object = getMapper(c);
+			Object object = getMapper(entityToMapperMap.get(c));
 			BasicMapper basicMapper = (BasicMapper) object;
 			// run the createTable() method on each of the proxies
 			basicMapper.createTable();
