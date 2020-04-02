@@ -27,7 +27,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		{
 			jdbc = new GhettoJdbcBlackBox();
 			jdbc.init("com.mysql.cj.jdbc.Driver", 				// DO NOT CHANGE
-					  "jdbc:mysql://localhost/jdbcblackbox",    // change jdbcblackbox to the DB name you wish to use
+					  "jdbc:mysql://localhost/jdbcblackbox?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC",    // change jdbcblackbox to the DB name you wish to use
 					  "root", 									// USER NAME
 					  "");										// PASSWORD
 		}
@@ -87,30 +87,31 @@ public class DaoInvocationHandler implements InvocationHandler {
 //												first VARCHAR(255), 
 //												last VARCHAR(255), age INTEGER, PRIMARY KEY ( id ))
 		
-// 		Using the @MappedClass annotation from method
-		// get the required class 		
-		// use reflection to check all the fields for @Column
-		// use the @Column attributed to generate the required sql statment
-		
 		String sqlStatement = "CREATE TABLE ";
 		String idStatement = "";
 		
+// 		Using the @MappedClass annotation from method
+		// get the required class 		
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
-		Field[] fields = c.getDeclaredFields();
 		
-		//Add the table type by using the class name
+		//Add the table name by using the table attribute in the entity class
 		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table().toUpperCase() + " (";
+		
+		// use reflection to check all the fields for @Column
+		// use the @Column attributed to generate the required sql statment
+		Field[] fields = c.getDeclaredFields();
 		
 		int numFields = fields.length;
 		int counter = 0;
 		
-		for(Field f:fields) {
+		for(Field f : fields) {
 			
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(Column.class)) {
 				
-				String name = f.getAnnotation(Column.class).name();
 				//String name = f.getName();
+				//Get attributes of Column
+				String name = f.getAnnotation(Column.class).name();
 				String sqlType = f.getAnnotation(Column.class).sqlType();
 				Boolean id = f.getAnnotation(Column.class).id();
 				

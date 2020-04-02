@@ -152,7 +152,7 @@ public class GhettoJdbcBlackBox {
 	public static void main(String[] args)
 	{
 		GhettoJdbcBlackBox jdbc = new GhettoJdbcBlackBox();
-		jdbc.init("com.mysql.cj.jdbc.Driver", "jdbc:mysql://localhost/jdbcblackbox", "root", "");
+		jdbc.init("com.mysql.cj.jdbc.Driver", "jdbc:mysql://localhost/jdbcblackbox?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC", "root", "");
 		
 		try
 		{
