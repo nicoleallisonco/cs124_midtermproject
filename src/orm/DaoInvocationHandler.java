@@ -234,7 +234,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 			counter++;
 		}
 		
-		if(o != null) {		
+		if(o == null) {		
 			insert(o, c, ((Entity) c.getAnnotation(Entity.class)).table());		
 		} else {		
 			update(o, c, ((Entity) c.getAnnotation(Entity.class)).table());
