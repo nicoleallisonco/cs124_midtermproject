@@ -158,9 +158,48 @@ public class DaoInvocationHandler implements InvocationHandler {
 		// for the WHERE clause
 				// if the primary key field value is null, throw a RuntimeException("no pk value")
 		
+		String sqlStatement = "DELETE FROM ";
+		String idStatement = "";
+		
+		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
+		Field[] fields = c.getDeclaredFields();
+		
+		//Add the table type by using the class name
+		sqlStatement = sqlStatement + c.getName() + " ";
+		
+		int counter = 0;
+		int pkId = -1;
+		
+		for(Field f:fields) {
+			
+			f.setAccessible(true);
+			if(f.isAnnotationPresent(Column.class)) {
+				
+				Boolean id = f.getAnnotation(Column.class).id();
+				
+				//This determines which field is the primary id 
+				if(id) {
+					pkId = counter;
+				}
+				
+			}
+			counter++;
+		}
+		
+		try {
+			if(pkId != -1) {	
+				
+				String fieldPk = fields[pkId].getName();
+				sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + o.toString();
+				
+			}
+		} catch (RuntimeException e) {
+			System.out.println("no pk value");
+		}
 		
 		// run the sql
-//		jdbc.runSQL(SQL STRING);
+		String sql = getValueAsSql(sqlStatement);
+		jdbc.runSQL(sql);
 	}
 	
 	// handles @Save
