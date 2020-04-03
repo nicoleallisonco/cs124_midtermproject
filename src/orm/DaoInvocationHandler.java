@@ -14,6 +14,8 @@ import annotations.Entity;
 import annotations.MappedClass;
 import annotations.Save;
 import annotations.Select;
+import io.github.lukehutch.fastclasspathscanner.FastClasspathScanner;
+import io.github.lukehutch.fastclasspathscanner.scanner.ScanResult;
 import realdb.GhettoJdbcBlackBox;
 
 public class DaoInvocationHandler implements InvocationHandler {
@@ -162,7 +164,6 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
 		Field[] fields = c.getDeclaredFields();
-		Field[] oFields = o.getClass().getDeclaredFields();
 		
 		//Add the table type by using the class name
 		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " ";
@@ -187,10 +188,10 @@ public class DaoInvocationHandler implements InvocationHandler {
 		}
 		
 		//Getting the getId method through reflection (using object o)
-		String valMethod = "get" + oFields[pkId].getName().substring(0, 1).toUpperCase() 
-			      + oFields[pkId].getName().substring(1) + "()";
+		String valMethod = "get" + fields[pkId].getName().substring(0, 1).toUpperCase() 
+			      + fields[pkId].getName().substring(1);
 		
-		Method m = o.getClass().getDeclaredMethod(valMethod);
+		Method m = c.getDeclaredMethod(valMethod);
 		
 		try {
 			
@@ -223,13 +224,6 @@ public class DaoInvocationHandler implements InvocationHandler {
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
 		Field[] fields = c.getDeclaredFields();
 		
-		System.out.println(o.toString());
-		
-		Class objectClass = Class.forName(o.toString());
-		Field[] oFields = objectClass.getDeclaredFields();
-		
-		System.out.println(oFields.length);
-		
 		int counter = 0;
 		int pkId = -1;
 		
@@ -248,10 +242,10 @@ public class DaoInvocationHandler implements InvocationHandler {
 			counter++;
 		}
 		
-		String valMethod = "get" + oFields[pkId].getName().substring(0, 1).toUpperCase() 
-			      + oFields[pkId].getName().substring(1) + "()";
+		String valMethod = "get" + fields[pkId].getName().substring(0, 1).toUpperCase() 
+			      + fields[pkId].getName().substring(1);
 		
-		Method m = o.getClass().getDeclaredMethod(valMethod);
+		Method m = c.getDeclaredMethod(valMethod);
 		
 		if(m.invoke(o) == null) {		
 			insert(o, c, ((Entity) c.getAnnotation(Entity.class)).table());		
@@ -275,7 +269,6 @@ public class DaoInvocationHandler implements InvocationHandler {
 		String valStatement = "VALUES (";
 		
 		Field[] fields = entityClass.getDeclaredFields();
-		Field[] oFields = o.getClass().getDeclaredFields();
 		
 		int numFields = fields.length;
 		int counter = 0;
@@ -286,10 +279,10 @@ public class DaoInvocationHandler implements InvocationHandler {
 			if(f.isAnnotationPresent(Column.class)) {
 				
 				String name = f.getAnnotation(Column.class).name();
-				String valMethod = "get" + oFields[counter].getName().substring(0, 1).toUpperCase() 
-						      + oFields[counter].getName().substring(1) + "()";
+				String valMethod = "get" + fields[counter].getName().substring(0, 1).toUpperCase() 
+						      + fields[counter].getName().substring(1);
 				
-				Method method = o.getClass().getDeclaredMethod(valMethod);
+				Method method = entityClass.getDeclaredMethod(valMethod);
 				
 				sqlStatement = sqlStatement + name;
 				valStatement = valStatement + method.invoke(o);
@@ -336,7 +329,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 				
 				String name = f.getAnnotation(Column.class).name();
 				String valMethod = "get" + oFields[counter].getName().substring(0, 1).toUpperCase() 
-						      + oFields[counter].getName().substring(1) + "()";
+						      + oFields[counter].getName().substring(1);
 				
 				Method method = o.getClass().getDeclaredMethod(valMethod);
 				
