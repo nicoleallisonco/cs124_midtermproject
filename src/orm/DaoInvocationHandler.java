@@ -159,7 +159,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 				// if the primary key field value is null, throw a RuntimeException("no pk value")
 		
 		String sqlStatement = "DELETE FROM ";
-		String idStatement = "";
+		String valMethod = "";
 		
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
 		Field[] fields = c.getDeclaredFields();
@@ -179,6 +179,8 @@ public class DaoInvocationHandler implements InvocationHandler {
 				
 				//This determines which field is the primary id 
 				if(id) {
+					valMethod = "get" + fields[counter].getName().substring(0, 1).toUpperCase() 
+						      + fields[counter].getName().substring(1);
 					pkId = counter;
 				}
 				
@@ -187,8 +189,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		}
 		
 		//Getting the getId method through reflection (using object o)
-		String valMethod = "get" + fields[pkId].getName().substring(0, 1).toUpperCase() 
-			      + fields[pkId].getName().substring(1);
+		
 		
 		Method m = c.getDeclaredMethod(valMethod);
 		
@@ -199,10 +200,14 @@ public class DaoInvocationHandler implements InvocationHandler {
 				String fieldPk = fields[pkId].getAnnotation(Column.class).name();
 				sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + m.invoke(o).toString();
 				
+			} else {
+				
+				System.out.println("no pk value");
+				
 			}
 			
 		} catch (RuntimeException e) {
-			System.out.println("no pk value");
+			
 		}
 		
 		// run the sql
@@ -275,7 +280,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 				Method method = entityClass.getDeclaredMethod(valMethod);
 				
 				sqlStatement = sqlStatement + name;
-				String val = method.invoke(o)+"";
+				String val = method.invoke(o) + "";
 				if (f.getType().equals(String.class)) {
 					val = getValueAsSql(val);
 				}
@@ -310,11 +315,9 @@ public class DaoInvocationHandler implements InvocationHandler {
 		String whereStatement = " WHERE ";
 		
 		Field[] fields = entityClass.getDeclaredFields();
-		Field[] oFields = o.getClass().getDeclaredFields();
 		
 		int numFields = fields.length;
 		int counter = 0;
-		int pkId = -1;
 		
 		for(Field f:fields) {
 			
@@ -322,10 +325,10 @@ public class DaoInvocationHandler implements InvocationHandler {
 			if(f.isAnnotationPresent(Column.class)) {
 				
 				String name = f.getAnnotation(Column.class).name();
-				String valMethod = "get" + oFields[counter].getName().substring(0, 1).toUpperCase() 
-						      + oFields[counter].getName().substring(1);
+				String valMethod = "get" + fields[counter].getName().substring(0, 1).toUpperCase() 
+						      + fields[counter].getName().substring(1);
 				
-				Method method = o.getClass().getDeclaredMethod(valMethod);
+				Method method = entityClass.getDeclaredMethod(valMethod);
 				
 				String val = method.invoke(o)+"";
 				if (f.getType().equals(String.class)) {
@@ -354,9 +357,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 // 		Run the sql
 		jdbc.runSQL(sqlStatement);
-		
-//		run sql
-//		jdbc.runSQL(SQL STRING);
+
 	}
 
 		
