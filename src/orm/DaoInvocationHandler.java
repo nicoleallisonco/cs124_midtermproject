@@ -60,10 +60,9 @@ public class DaoInvocationHandler implements InvocationHandler {
 			
 		} else if(method.isAnnotationPresent(Select.class)) {
 			
-			select(method, args);
+			return select(method, args);
 			
-		}
-			
+		} 
 		return null;
 	}
 	
@@ -400,7 +399,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 					String paramValue = param.value();
 					String newState = ":" + paramValue;
 					if(selQuery.contains(newState)) {
-						selQuery = selQuery.replaceAll(newState, ""+ args[a]);
+						selQuery = selQuery.replaceAll(newState, ""+ getValueAsSql(args[a]));
 					} else {
 						throw new Exception();
 					}
@@ -411,14 +410,13 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 // PART II
 		
-//		this will pull actual values from the DB		
-		selQuery = getValueAsSql(selQuery);
+//		this will pull actual values from the DB	
 		List<HashMap<String, Object>> results = jdbc.runSQLQuery(selQuery);
-		
+
 		// process list based on getReturnType
 		if (method.getReturnType()==List.class)
 		{
-			List returnValue = new ArrayList();
+			List<Object> returnValue = new ArrayList();
 			
 			// create an instance for each entry in results based on mapped class
 			// map the values to the corresponding fields in the object
@@ -438,7 +436,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 					for(int k = 0; k<fields.length; k++) {
 						if(fields[j].getAnnotation(Column.class).name() != null) {
 							
-							if(fields[j].getAnnotation(Column.class).name() == colName[k]){
+							if(fields[j].getAnnotation(Column.class).name().equals(colName[k])){
 								curr = k;
 								break;
 							}
@@ -453,7 +451,6 @@ public class DaoInvocationHandler implements InvocationHandler {
 				}
 				returnValue.add(obj);
 			}
-			
 			return returnValue;
 		}
 		else
@@ -471,11 +468,9 @@ public class DaoInvocationHandler implements InvocationHandler {
 			} else if(results.size()>1) {
 				throw new RuntimeException("More than one object matches");
 			} else {
-				Object obj = null;
+				Object obj = c.newInstance();
 				for(HashMap<String, Object> inst: results) {
-					
-					obj = c.newInstance();
-					
+
 					int curr = 0;
 					for(int j = 0; j<fields.length; j++) {
 						String valMethod = "set" + fields[j].getName().substring(0, 1).toUpperCase() 
@@ -486,7 +481,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 						for(int k = 0; k<fields.length; k++) {
 							if(fields[j].getAnnotation(Column.class).name() != null) {
 								
-								if(fields[j].getAnnotation(Column.class).name() == colName[k]){
+								if(fields[j].getAnnotation(Column.class).name().equals(colName[k])){
 									curr = k;
 									break;
 								}
