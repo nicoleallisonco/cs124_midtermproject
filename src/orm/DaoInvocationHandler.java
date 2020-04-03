@@ -3,7 +3,9 @@ package orm;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import annotations.Column;
@@ -11,6 +13,7 @@ import annotations.CreateTable;
 import annotations.Delete;
 import annotations.Entity;
 import annotations.MappedClass;
+import annotations.Param;
 import annotations.Save;
 import annotations.Select;
 import io.github.lukehutch.fastclasspathscanner.FastClasspathScanner;
@@ -193,20 +196,14 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 		Method m = c.getDeclaredMethod(valMethod);
 		
-		try {
+		if(m.invoke(o) != null) {	
 			
-			if(m.invoke(o) != null) {	
-				
-				String fieldPk = fields[pkId].getAnnotation(Column.class).name();
-				sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + m.invoke(o).toString();
-				
-			} else {
-				
-				System.out.println("no pk value");
-				
-			}
+			String fieldPk = fields[pkId].getAnnotation(Column.class).name();
+			sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + m.invoke(o);
 			
-		} catch (RuntimeException e) {
+		} else {
+			
+			throw new RuntimeException("no pk value");
 			
 		}
 		
@@ -369,14 +366,53 @@ public class DaoInvocationHandler implements InvocationHandler {
 // PART I		
 // 		Using the @MappedClass annotation from method
 //		get the required class
-//		Use this class to extra all the column information (this is the replacement for @Results/@Result)		
+//		Use this class to extract all the column information (this is the replacement for @Results/@Result)		
 //		generate the SELECT QUERY		
 
+		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
+		Field[] fields = c.getDeclaredFields();
+		String colName[] = new String[fields.length];
+		
+		String selQuery = method.getAnnotation(Select.class).value();
+		int counter = 0;
+		
+		for(Field f:fields) {
+			f.setAccessible(true);
+			if(f.isAnnotationPresent(Column.class)) {
+				String name = f.getAnnotation(Column.class).name();
+				colName[counter] = name;
+			}
+			counter++;
+		}
+		
+		//COPY PASTED FROM OLD LAB
+		if(selQuery.contains(":table")) {
+			selQuery = selQuery.replace(":table",((Entity) c.getAnnotation(Entity.class)).table());
+		}
+		
+		Parameter[] p = method.getParameters();
+		int a = 0;
+		for(Parameter i: p) {		
+			if(i.isAnnotationPresent(Param.class)) {
+				Object current = i.getAnnotation(Param.class);
+				if(current != null) {
+					Param param = (Param) current;
+					String paramValue = param.value();
+					String newState = ":" + paramValue;
+					if(selQuery.contains(newState)) {
+						selQuery = selQuery.replaceAll(newState, ""+ args[a]);
+					} else {
+						throw new Exception();
+					}
+				}
+			}
+			a++;
+		}
+		
 // PART II
 		
 //		this will pull actual values from the DB		
-//		List<HashMap<String, Object>> results = jdbc.runSQLQuery(SQL QUERY);
-
+		List<HashMap<String, Object>> results = jdbc.runSQLQuery(selQuery);
 		
 		// process list based on getReturnType
 		if (method.getReturnType()==List.class)
@@ -386,6 +422,35 @@ public class DaoInvocationHandler implements InvocationHandler {
 			// create an instance for each entry in results based on mapped class
 			// map the values to the corresponding fields in the object
 			// DO NOT HARD CODE THE TYPE and FIELDS USE REFLECTION
+			
+			for(HashMap<String, Object> inst: results) {
+				
+				Object obj = c.newInstance();
+				
+				int curr = 0;
+				for(int j = 0; j<fields.length; j++) {
+					String valMethod = "set" + fields[j].getName().substring(0, 1).toUpperCase() 
+						      + fields[j].getName().substring(1);
+					Method m = c.getDeclaredMethod(valMethod, fields[j].getType());
+					
+					//TO CHECK IF COLUMN NAME IS MATCHED WITH THE RIGHT FIELD NAME
+					for(int k = 0; k<fields.length; k++) {
+						if(fields[j].getAnnotation(Column.class).name() != null) {
+							
+							if(fields[j].getAnnotation(Column.class).name() == colName[k]){
+								curr = k;
+							}
+							
+						} else {
+							//FOR BONUS
+						}
+					}
+					
+					m.invoke(obj, inst.get(colName[curr]));
+					
+				}
+				returnValue.add(obj);
+			}
 			
 			return returnValue;
 		}
