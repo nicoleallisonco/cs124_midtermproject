@@ -162,6 +162,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
 		Field[] fields = c.getDeclaredFields();
+		Field[] oFields = o.getClass().getDeclaredFields();
 		
 		//Add the table type by using the class name
 		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " ";
@@ -185,12 +186,18 @@ public class DaoInvocationHandler implements InvocationHandler {
 			counter++;
 		}
 		
+		//Getting the getId method through reflection (using object o)
+		String valMethod = "get" + oFields[pkId].getName().substring(0, 1).toUpperCase() 
+			      + oFields[pkId].getName().substring(1) + "()";
+		
+		Method m = o.getClass().getDeclaredMethod(valMethod);
+		
 		try {
 			
-			if(pkId != -1 && o != null) {	
+			if(m.invoke(o) != null) {	
 				
 				String fieldPk = fields[pkId].getAnnotation(Column.class).name();
-				sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + o.toString();
+				sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + m.invoke(o).toString();
 				
 			}
 			
@@ -216,6 +223,13 @@ public class DaoInvocationHandler implements InvocationHandler {
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
 		Field[] fields = c.getDeclaredFields();
 		
+		System.out.println(o.toString());
+		
+		Class objectClass = Class.forName(o.toString());
+		Field[] oFields = objectClass.getDeclaredFields();
+		
+		System.out.println(oFields.length);
+		
 		int counter = 0;
 		int pkId = -1;
 		
@@ -225,7 +239,6 @@ public class DaoInvocationHandler implements InvocationHandler {
 			if(f.isAnnotationPresent(Column.class)) {
 				
 				Boolean id = f.getAnnotation(Column.class).id();
-				
 				//This determines which field is the primary id 
 				if(id) {
 					pkId = counter;
@@ -235,7 +248,12 @@ public class DaoInvocationHandler implements InvocationHandler {
 			counter++;
 		}
 		
-		if(o == null) {		
+		String valMethod = "get" + oFields[pkId].getName().substring(0, 1).toUpperCase() 
+			      + oFields[pkId].getName().substring(1) + "()";
+		
+		Method m = o.getClass().getDeclaredMethod(valMethod);
+		
+		if(m.invoke(o) == null) {		
 			insert(o, c, ((Entity) c.getAnnotation(Entity.class)).table());		
 		} else {		
 			update(o, c, ((Entity) c.getAnnotation(Entity.class)).table());
@@ -271,10 +289,10 @@ public class DaoInvocationHandler implements InvocationHandler {
 				String valMethod = "get" + oFields[counter].getName().substring(0, 1).toUpperCase() 
 						      + oFields[counter].getName().substring(1) + "()";
 				
-				Method method = entityClass.getDeclaredMethod(valMethod);
+				Method method = o.getClass().getDeclaredMethod(valMethod);
 				
 				sqlStatement = sqlStatement + name;
-				valStatement = valStatement + method.invoke(entityClass);
+				valStatement = valStatement + method.invoke(o);
 				
 				//Check if we should add a comma (shouldn't add if its the last)
 				if(counter < numFields - 1) {
@@ -286,7 +304,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 			counter++;
 		}
 
-		sqlStatement = sqlStatement + valStatement;
+		sqlStatement = sqlStatement +") "+ valStatement + ") ";
 		
 // 		Run the sql
 		jdbc.runSQL(sqlStatement);
@@ -300,6 +318,50 @@ public class DaoInvocationHandler implements InvocationHandler {
 //		WHERE condition;
 		
 //		HINT: columnX comes from the entityClass, valueX comes from o 		
+		
+		String sqlStatement = "UPDATE " + tableName + " SET";
+		String whereStatement = "WHERE ";
+		
+		Field[] fields = entityClass.getDeclaredFields();
+		Field[] oFields = o.getClass().getDeclaredFields();
+		
+		int numFields = fields.length;
+		int counter = 0;
+		int pkId = -1;
+		
+		for(Field f:fields) {
+			
+			f.setAccessible(true);
+			if(f.isAnnotationPresent(Column.class)) {
+				
+				String name = f.getAnnotation(Column.class).name();
+				String valMethod = "get" + oFields[counter].getName().substring(0, 1).toUpperCase() 
+						      + oFields[counter].getName().substring(1) + "()";
+				
+				Method method = o.getClass().getDeclaredMethod(valMethod);
+				
+				sqlStatement = sqlStatement + name + " = " + method.invoke(o);
+				
+				//Check if we should add a comma (shouldn't add if its the last)
+				if(counter < numFields - 1) {
+					sqlStatement += ", ";
+				}
+				
+				Boolean id = f.getAnnotation(Column.class).id();
+				
+				//This determines which field is the primary id 
+				if(id) {
+					whereStatement = whereStatement + name + " = " + method.invoke(o);
+				}
+				
+			}
+			counter++;
+		}
+
+		sqlStatement = sqlStatement + whereStatement;
+		
+// 		Run the sql
+		jdbc.runSQL(sqlStatement);
 		
 //		run sql
 //		jdbc.runSQL(SQL STRING);
