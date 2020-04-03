@@ -412,6 +412,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 // PART II
 		
 //		this will pull actual values from the DB		
+		selQuery = getValueAsSql(selQuery);
 		List<HashMap<String, Object>> results = jdbc.runSQLQuery(selQuery);
 		
 		// process list based on getReturnType
@@ -439,6 +440,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 							
 							if(fields[j].getAnnotation(Column.class).name() == colName[k]){
 								curr = k;
+								break;
 							}
 							
 						} else {
@@ -464,8 +466,42 @@ public class DaoInvocationHandler implements InvocationHandler {
 				// create one instance based on mapped class
 				// map the values to the corresponding fields in the object
 				// DO NOT HARD CODE THE TYPE and FIELDS USE REFLECTION
+			if(results.size()==0) {			
+				return null;
+			} else if(results.size()>1) {
+				throw new RuntimeException("More than one object matches");
+			} else {
+				Object obj = null;
+				for(HashMap<String, Object> inst: results) {
+					
+					obj = c.newInstance();
+					
+					int curr = 0;
+					for(int j = 0; j<fields.length; j++) {
+						String valMethod = "set" + fields[j].getName().substring(0, 1).toUpperCase() 
+							      + fields[j].getName().substring(1);
+						Method m = c.getDeclaredMethod(valMethod, fields[j].getType());
 						
-			return null;
+						//TO CHECK IF COLUMN NAME IS MATCHED WITH THE RIGHT FIELD NAME
+						for(int k = 0; k<fields.length; k++) {
+							if(fields[j].getAnnotation(Column.class).name() != null) {
+								
+								if(fields[j].getAnnotation(Column.class).name() == colName[k]){
+									curr = k;
+									break;
+								}
+								
+							} else {
+								//FOR BONUS
+							}
+						}
+						
+						m.invoke(obj, inst.get(colName[curr]));
+						
+					}
+				}
+				return obj;
+			}
 		}
 	}
 	
