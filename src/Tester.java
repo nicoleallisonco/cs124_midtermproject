@@ -20,7 +20,6 @@ public class Tester {
 			s.setAge(10+i);
 			s.setFirst("Test"+i);
 			s.setLast("Test"+i);
-			
 			sm.save(s);
 		}
 		

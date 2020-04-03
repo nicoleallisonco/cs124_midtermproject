@@ -1,6 +1,5 @@
 package orm;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -43,18 +42,18 @@ public class DaoInvocationHandler implements InvocationHandler {
 			// @Save
 			// @Delete
 			// @Select
-		
+
 		if(method.isAnnotationPresent(CreateTable.class)) {
 			
 			createTable(method);
 			
 		} else if(method.isAnnotationPresent(Save.class)) {
 			
-			save(method, args);
+			save(method, args[0]);
 			
 		} else if(method.isAnnotationPresent(Delete.class)) {
 			
-			delete(method, args);
+			delete(method, args[0]);
 			
 		} else if(method.isAnnotationPresent(Select.class)) {
 			
@@ -223,27 +222,18 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
 		Field[] fields = c.getDeclaredFields();
-		
-		int counter = 0;
-		int pkId = -1;
+		String valMethod = "";
 		
 		for(Field f:fields) {
-			
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(Column.class)) {
-				
 				Boolean id = f.getAnnotation(Column.class).id();
 				//This determines which field is the primary id 
 				if(id) {
-					pkId = counter;
+					valMethod += "get" + f.getName().substring(0, 1).toUpperCase() + f.getName().substring(1);
 				}
-				
 			}
-			counter++;
 		}
-		
-		String valMethod = "get" + fields[pkId].getName().substring(0, 1).toUpperCase() 
-			      + fields[pkId].getName().substring(1);
 		
 		Method m = c.getDeclaredMethod(valMethod);
 		
@@ -285,7 +275,11 @@ public class DaoInvocationHandler implements InvocationHandler {
 				Method method = entityClass.getDeclaredMethod(valMethod);
 				
 				sqlStatement = sqlStatement + name;
-				valStatement = valStatement + method.invoke(o);
+				String val = method.invoke(o)+"";
+				if (f.getType().equals(String.class)) {
+					val = getValueAsSql(val);
+				}
+				valStatement = valStatement + val;
 				
 				//Check if we should add a comma (shouldn't add if its the last)
 				if(counter < numFields - 1) {
@@ -298,7 +292,7 @@ public class DaoInvocationHandler implements InvocationHandler {
 		}
 
 		sqlStatement = sqlStatement +") "+ valStatement + ") ";
-		
+	
 // 		Run the sql
 		jdbc.runSQL(sqlStatement);
 	}
@@ -312,8 +306,8 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 //		HINT: columnX comes from the entityClass, valueX comes from o 		
 		
-		String sqlStatement = "UPDATE " + tableName + " SET";
-		String whereStatement = "WHERE ";
+		String sqlStatement = "UPDATE " + tableName + " SET ";
+		String whereStatement = " WHERE ";
 		
 		Field[] fields = entityClass.getDeclaredFields();
 		Field[] oFields = o.getClass().getDeclaredFields();
@@ -333,7 +327,12 @@ public class DaoInvocationHandler implements InvocationHandler {
 				
 				Method method = o.getClass().getDeclaredMethod(valMethod);
 				
-				sqlStatement = sqlStatement + name + " = " + method.invoke(o);
+				String val = method.invoke(o)+"";
+				if (f.getType().equals(String.class)) {
+					val = getValueAsSql(val);
+				}
+				
+				sqlStatement = sqlStatement + name + " = " + val;
 				
 				//Check if we should add a comma (shouldn't add if its the last)
 				if(counter < numFields - 1) {

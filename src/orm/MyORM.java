@@ -32,7 +32,7 @@ public class MyORM
 		scanEntities();
 				
 		// create all entity tables
-		createTables();
+		//createTables();
 
 	}
 
