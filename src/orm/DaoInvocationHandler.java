@@ -93,12 +93,23 @@ public class DaoInvocationHandler implements InvocationHandler {
 		String sqlStatement = "CREATE TABLE ";
 		String idStatement = "";
 		
+		//Mapping what SQL Type should be used depending on the Type of the object
+		HashMap<Class, String> sqlTypes = new HashMap();
+		sqlTypes.put(String.class, "VARCHAR(255)");
+		sqlTypes.put(Integer.class, "INTEGER");
+		sqlTypes.put(Boolean.class, "BOOLEAN");
+		
+		
 // 		Using the @MappedClass annotation from method
 		// get the required class 		
 		Class c = method.getDeclaringClass().getAnnotation(MappedClass.class).clazz();
 		
 		//Add the table name by using the table attribute in the entity class
-		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table().toUpperCase() + " (";
+		if(((Entity) c.getAnnotation(Entity.class)).table() != null) {
+			sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " (";
+		} else {
+			sqlStatement = sqlStatement + c.getName().toUpperCase() + " (";
+		}
 		
 		// use reflection to check all the fields for @Column
 		// use the @Column attributed to generate the required sql statment
@@ -112,11 +123,25 @@ public class DaoInvocationHandler implements InvocationHandler {
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(Column.class)) {
 				
-				//String name = f.getName();
-				//Get attributes of Column
-				String name = f.getAnnotation(Column.class).name();
-				String sqlType = f.getAnnotation(Column.class).sqlType();
+				String name = "";
+				String sqlType = "";
 				Boolean id = f.getAnnotation(Column.class).id();
+				//Get attributes of Column
+				if(f.getAnnotation(Column.class).name() != null) {
+					name = f.getAnnotation(Column.class).name();
+				} else {
+					name = f.getName().toLowerCase();
+				}
+				if(f.getAnnotation(Column.class).name() != null) {
+					sqlType = f.getAnnotation(Column.class).sqlType();
+				} else {
+					//PLACE A MAPPER
+					sqlType = sqlTypes.get(f.getType());
+					if(id) {
+						sqlType += " not NULL AUTO_INCREMENT";
+					}
+				}
+				
 				
 				sqlStatement = sqlStatement + name + " " + sqlType;
 				
@@ -167,7 +192,11 @@ public class DaoInvocationHandler implements InvocationHandler {
 		Field[] fields = c.getDeclaredFields();
 		
 		//Add the table type by using the class name
-		sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " ";
+		if(((Entity) c.getAnnotation(Entity.class)).table() != null) {
+			sqlStatement = sqlStatement + ((Entity) c.getAnnotation(Entity.class)).table() + " ";
+		} else {
+			sqlStatement = sqlStatement + c.getName() + " ";
+		}
 		
 		int counter = 0;
 		int pkId = -1;
@@ -197,7 +226,12 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 		if(m.invoke(o) != null) {	
 			
-			String fieldPk = fields[pkId].getAnnotation(Column.class).name();
+			String fieldPk = "";
+			if(fields[pkId].getAnnotation(Column.class).name() != null) {
+				fieldPk = fields[pkId].getAnnotation(Column.class).name();
+			} else {
+				fieldPk = fields[pkId].getName();
+			}
 			sqlStatement = sqlStatement + "WHERE " + fieldPk + "=" + m.invoke(o);
 			
 		} else {
@@ -238,10 +272,18 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 		Method m = c.getDeclaredMethod(valMethod);
 		
-		if(m.invoke(o) == null) {		
-			insert(o, c, ((Entity) c.getAnnotation(Entity.class)).table());		
+		if(m.invoke(o) == null) {	
+			if(((Entity) c.getAnnotation(Entity.class)).table() != null) {
+				insert(o, c, ((Entity) c.getAnnotation(Entity.class)).table());	
+			} else {
+				insert(o, c, c.getName());	
+			}
 		} else {		
-			update(o, c, ((Entity) c.getAnnotation(Entity.class)).table());
+			if(((Entity) c.getAnnotation(Entity.class)).table() != null) {
+				update(o, c, ((Entity) c.getAnnotation(Entity.class)).table());	
+			} else {
+				update(o, c, c.getName());	
+			}
 		}
 		
 	}
@@ -268,8 +310,12 @@ public class DaoInvocationHandler implements InvocationHandler {
 			
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(Column.class)) {
-				
-				String name = f.getAnnotation(Column.class).name();
+				String name = "";
+				if(f.getAnnotation(Column.class).name() != null) {
+					name = f.getAnnotation(Column.class).name();
+				} else {
+					name = f.getName().toLowerCase();
+				}
 				String valMethod = "get" + fields[counter].getName().substring(0, 1).toUpperCase() 
 						      + fields[counter].getName().substring(1);
 				
@@ -320,7 +366,12 @@ public class DaoInvocationHandler implements InvocationHandler {
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(Column.class)) {
 				
-				String name = f.getAnnotation(Column.class).name();
+				String name = "";
+				if(f.getAnnotation(Column.class).name() != null) {
+					name = f.getAnnotation(Column.class).name();
+				} else {
+					name = f.getName().toLowerCase();
+				}
 				String valMethod = "get" + fields[counter].getName().substring(0, 1).toUpperCase() 
 						      + fields[counter].getName().substring(1);
 				
@@ -378,7 +429,12 @@ public class DaoInvocationHandler implements InvocationHandler {
 		for(Field f:fields) {
 			f.setAccessible(true);
 			if(f.isAnnotationPresent(Column.class)) {
-				String name = f.getAnnotation(Column.class).name();
+				String name = "";
+				if(f.getAnnotation(Column.class).name() != null) {
+					name = f.getAnnotation(Column.class).name();
+				} else {
+					name = f.getName().toLowerCase();
+				}
 				colName[counter] = name;
 			}
 			counter++;
@@ -386,7 +442,11 @@ public class DaoInvocationHandler implements InvocationHandler {
 		
 		//COPY PASTED FROM OLD LAB
 		if(selQuery.contains(":table")) {
-			selQuery = selQuery.replace(":table",((Entity) c.getAnnotation(Entity.class)).table());
+			if(((Entity) c.getAnnotation(Entity.class)).table() != null) {
+				selQuery = selQuery.replace(":table",((Entity) c.getAnnotation(Entity.class)).table());
+			} else {
+				selQuery = selQuery.replace(":table",c.getName());
+			}
 		}
 		
 		Parameter[] p = method.getParameters();
@@ -442,7 +502,12 @@ public class DaoInvocationHandler implements InvocationHandler {
 							}
 							
 						} else {
-							//FOR BONUS
+							//FOR BONUS					
+							if(fields[j].getName().equals(colName[k])) {
+								curr = k;
+								break;
+							}
+							
 						}
 					}
 					
@@ -488,6 +553,10 @@ public class DaoInvocationHandler implements InvocationHandler {
 								
 							} else {
 								//FOR BONUS
+								if(fields[j].getName().equals(colName[k])) {
+									curr = k;
+									break;
+								}
 							}
 						}
 						
