@@ -1,7 +1,9 @@
 import dao.StudentMapper;
 import dao.SubjectMapper;
+import dao.TestMapper;
 import entity.Student;
 import entity.Subject;
+import entity.Test;
 import orm.MyORM;
 
 public class Tester {
@@ -30,7 +32,6 @@ public class Tester {
 		
 		System.out.println(sm.getByFirstNameAndLastName("Test1", "Test1"));
 		
-		
 		SubjectMapper sbm = (SubjectMapper) orm.getMapper(SubjectMapper.class);
 		
 		Subject sb = new Subject();
@@ -38,7 +39,31 @@ public class Tester {
 		sb.setNumStudents(20);
 		
 		sbm.save(sb);
-
+		
+		//Added to test Bonus 1
+		
+		TestMapper tm = (TestMapper) orm.getMapper(TestMapper.class);
+		
+		Test t = new Test();
+		t.setName("Bonus test");
+		
+		tm.save(t);
+		
+		Test t2 = new Test();
+		t2.setName("Bonus test2");
+		
+		tm.save(t2);
+		
+		Test tr = tm.getById(2);
+		tr.setName("Updated");
+		
+		tm.save(tr);
+		
+		System.out.println(tm.getById(1));
+		
+		System.out.println(tm.getAll());
+		
+		tm.delete(tm.getById(1));
 	}
 
 }
